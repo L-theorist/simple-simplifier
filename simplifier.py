@@ -251,3 +251,23 @@ def convert(preds, token_dict):
 def predictor(model, enc_line):
     pred = model.predict_classes(enc_line)
     pass
+
+def shorten(data_src, data_dst, threshold, short_dst=False):
+    """
+    Filters samples of sentence length in source < threshold.
+    If short_dst, filters by target sentence length.
+    """
+    #res = [x for x in data if len((tokenizer(x)))<threshold]
+    # for sent1, sent2 in zip(data_src, data_dst):
+    #     if len(tokenizer(sent1)) >= threshold:
+    #         data_src.remove(sent1)
+    #         data_dst.remove(sent2)
+    if short_dst:
+        res = [x for x in zip(data_src, data_dst) if len((tokenizer(x[1])))<threshold]
+    else:
+        res = [x for x in zip(data_src, data_dst) if len((tokenizer(x[0])))<threshold]
+
+    #res = [x for x in zip(data_src, data_dst) if len((tokenizer(x[0])))<threshold]
+    data_src = [x[0] for x in res]
+    data_dst = [x[1] for x in res]
+    return data_src, data_dst

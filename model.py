@@ -27,18 +27,20 @@ def build_model(vocab_in, vocab_out, length_in, length_out, n_units, use_emb=Non
 
 
     return model
-def build_ed_model(vocab_in, vocab_out, length_in, length_out, n_units, use_emb=None, unfreeze_emb=True):
+def build_ed_model(vocab_in, vocab_out, length_in, length_out, n_units, use_emb=None, unfreeze_emb=True, \
+use_dec_emb=None, unfreeze_dec_emb=True):
     if use_emb is not None:
         assert n_units==use_emb.shape[-1], "Embedding dimension should match n_units."
     #Encoder
     encoder_input = Input(shape=(None,))# vocab_in+1))
-    encoder_emb = layers.Embedding(vocab_in+1,
+    encoder_emb_layer = layers.Embedding(vocab_in,
                                     n_units,
                                     #input_length=length_in,
                                     #embeddings_initializer='lecun_uniform',
                                     mask_zero=True,
                                     #trainable=True
-                                    )(encoder_input)
+                                    )
+    encoder_emb = encoder_emb_layer(encoder_input)
     encoder_lstm = layers.LSTM(n_units, return_state=True)
     #encoder_output = layers.RepeatVector(length_out)(encoder_output)
     encoder_output, state_h, state_c = encoder_lstm(encoder_emb)
@@ -56,8 +58,16 @@ def build_ed_model(vocab_in, vocab_out, length_in, length_out, n_units, use_emb=
 
     model = models.Model([encoder_input, decoder_input], decoder_output)
     if use_emb is not None:
-        model.layers[1].set_weights([use_emb])
-        model.layers[1].trainable = unfreeze_emb
+        # model.layers[1].set_weights([use_emb])
+        # model.layers[1].trainable = unfreeze_emb
+        encoder_emb_layer.set_weights([use_emb])
+        encoder_emb_layer.trainable = unfreeze_emb
+    if use_dec_emb is not None:
+        decoder_emb_layer.set_weights([use_dec_emb])
+        decoder_emb_layer.trainable = unfreeze_dec_emb
+
+
+
     # Encoder&Decoder for predictions
     encoder_model = models.Model(encoder_input, encoder_states)
     decoder_state_input_h = Input(shape=(n_units,))
@@ -97,17 +107,21 @@ def decode_sequence(sequence, enc, dec, token_dict, token_dict_reverse=None, len
     stop_condition = False
     decoded_sentence = ''
 
+    output_len = 0
     while not stop_condition:
+
         #output_tokens, h, c = decoder_model.predict([decoded_sequence] + states_value)
         output_tokens, h, c = dec.predict([decoded_sequence] + states_value)
         # Sample a token
         sampled_token_index = np.argmax(output_tokens[0, -1, :])
         sampled_word = token_dict_reverse[sampled_token_index]
-        decoded_sentence += ' '+sampled_word
 
+        output_len += 1
         # Exit condition: either hit max length or find stop token.
-        if (sampled_word == '<END>' or len(decoded_sentence) > length_out):
+        if (sampled_word == '<END>' or output_len  > length_out):
             stop_condition = True
+        else:
+            decoded_sentence += ' '+sampled_word
 
         # Update the target sequence (of length 1).
         decoded_sequence = np.zeros((1,1))
