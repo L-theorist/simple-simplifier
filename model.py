@@ -133,8 +133,74 @@ def decode_sequence(sequence, enc, dec, token_dict, token_dict_reverse=None, len
     return decoded_sentence
 
 
+
+
 def bleu_score(ref, hyp):
 
     ref = simplifier.tokenize(ref[0])
     BLEUscore = nltk.translate.bleu_score.sentence_bleu([ref], hyp, weights=(1, 1, 1, 1))
     return np.round(BLEUscore*100,1)
+
+
+
+def build_ed_dp_model(vocab_in, vocab_out, length_in, length_out, n_units, n2_units, use_emb=None, unfreeze_emb=True, \
+use_dec_emb=None, unfreeze_dec_emb=True):
+    if use_emb is not None:
+        assert n_units==use_emb.shape[-1], "Embedding dimension should match n_units."
+    #Encoder
+    encoder_input = Input(shape=(None,))# vocab_in+1))
+    encoder_emb_layer = layers.Embedding(vocab_in,
+                                    n_units,
+                                    #input_length=length_in,
+                                    #embeddings_initializer='lecun_uniform',
+                                    mask_zero=True,
+                                    #trainable=True
+                                    )
+    encoder_emb = encoder_emb_layer(encoder_input)
+    encoder_lstm = layers.LSTM(n_units, return_sequences=True, return_state=False)
+    encoder_lstm2 = layers.LSTM(n2_units, return_state=True)
+    #encoder_output = layers.RepeatVector(length_out)(encoder_output)
+    encoder_output, state_h, state_c = encoder_lstm2(encoder_lstm(encoder_emb))
+    encoder_states = [state_h, state_c]
+    #Decoder
+    decoder_input = Input(shape=(None,))# vocab_out+1))
+    decoder_emb_layer = layers.Embedding(vocab_out , n_units, mask_zero=True)
+    decoder_emb = decoder_emb_layer(decoder_input)
+    decoder_lstm2 = layers.LSTM(n2_units, return_sequences=True, return_state=False)
+    decoder_lstm = layers.LSTM(n_units, return_sequences=True, return_state=True)
+    decoder_outputs, _, _ = decoder_lstm(decoder_lstm2(decoder_emb, initial_state=encoder_states))
+    #decoder_output = layers.TimeDistributed(layers.Dense(vocab_out+1, activation='softmax'))(decoder_output)
+
+    decoder_dense = layers.Dense(vocab_out, activation='softmax')
+    decoder_output = decoder_dense(decoder_outputs)
+
+    model = models.Model([encoder_input, decoder_input], decoder_output)
+    if use_emb is not None:
+        # model.layers[1].set_weights([use_emb])
+        # model.layers[1].trainable = unfreeze_emb
+        encoder_emb_layer.set_weights([use_emb])
+        encoder_emb_layer.trainable = unfreeze_emb
+    if use_dec_emb is not None:
+        decoder_emb_layer.set_weights([use_dec_emb])
+        decoder_emb_layer.trainable = unfreeze_dec_emb
+
+
+
+    # Encoder&Decoder for predictions
+    encoder_model = models.Model(encoder_input, encoder_states)
+    decoder_state_input_h = Input(shape=(n2_units,))
+    decoder_state_input_c = Input(shape=(n2_units,))
+    decoder_states_inputs = [decoder_state_input_h, decoder_state_input_c]
+
+    decoder_emb2 = decoder_emb_layer(decoder_input)
+
+    decoder_outputs2, state_h2, state_c2 = decoder_lstm(decoder_lstm2(decoder_emb2, initial_state=decoder_states_inputs))
+    decoder_states2 = [state_h2, state_c2]
+    decoder_outputs2 = decoder_dense(decoder_outputs2)
+
+    decoder_model = models.Model(
+                [decoder_input] + decoder_states_inputs,
+                [decoder_outputs2] + decoder_states2)
+
+
+    return model, encoder_model, decoder_model

@@ -108,7 +108,6 @@ simplejson==3.17.0
 six==1.14.0
 sklearn==0.0
 smmap==3.0.1
--e git+https://github.com/ADGefficiency/teaching-monolith@05226a3db4c7b23c1b326cd8dd3ae4463a9b3196#egg=splitter&subdirectory=test-driven-development/Splitter
 strict-rfc3339==0.7
 swagger-spec-validator==2.5.0
 tensorboard==1.15.0

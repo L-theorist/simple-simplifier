@@ -190,13 +190,17 @@ def generator_ed(X_data, Y_data, batch_size, vocab_in, vocab_out, samples=30000,
     samples_per_epoch = x_data.shape[0]
     number_of_batches = samples_per_epoch/batch_size
     counter=0
-    pad = np.zeros((batch_size, 1))
-    pad_end = np.zeros((batch_size, 1))
+    # pad = np.zeros((batch_size, 1))
+    # pad_end = np.zeros((batch_size, 1))
     # pad = np.zeros((batch_size,))
     # pad_end = np.zeros((batch_size,))
     while True:
         x_batch = np.array(x_data[batch_size*counter:batch_size*(counter+1)])#.astype('float32')
         y_batch = np.array(y_data[batch_size*counter:batch_size*(counter+1)])#.astype('float32')
+        pad_size = x_batch.shape[0]
+        pad = np.zeros((pad_size, 1))
+        pad_end = np.zeros((pad_size, 1))
+
         x2_batch = np.concatenate((pad, y_batch[:,:-1]), axis=1)
         #x2_batch = np.concatenate((pad, y_batch), axis=0)
         y_batch = np.concatenate((y_batch[:,1:], pad_end), axis=1)
